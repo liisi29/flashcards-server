@@ -12,7 +12,7 @@ module.exports = {
   connectToServer: async function (callback: (err: any) => void) {
     try {
       await client.connect();
-      //   _db = client.db(mongoDB);
+      _db = client.db(mongoDB);
       console.log(`Connected to database: ${mongoDB}`);
       return callback(null);
     } catch (err) {

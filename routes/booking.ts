@@ -7,7 +7,7 @@ const _collection = process.env.MONGO_COLLECTION || "";
 const _routes = _app.Router();
 
 _routes
-  .route("/booking")
+  .route("/bookings")
   .get(async function (
     req: any,
     res: { json: (arg0: any) => void; status: any }
@@ -32,23 +32,45 @@ _routes
       res.json(result); // Send the result as JSON
     } catch (err) {
       console.error("Error fetching bookings:", err);
-      res.status(500).json({ error: "Failed to fetch countries" });
+      res.status(500).json({ error: "Failed to fetch bookings" });
     }
   });
 _routes
+  .route("/bookings:id")
+  .get(function (
+    req: { params: { id: any } },
+    res: { json: (arg0: any) => void }
+  ) {
+    let db_connect = _connection.getDb();
+    let myquery = { _id: ObjectId(req.params.id) };
+    db_connect
+      .collection(_collection)
+      .findOne(myquery, function (err: any, result: any) {
+        if (err) throw err;
+        res.json(result);
+      });
+  });
+
+_routes
   .route("/booking/add")
-  .post(function (
+  .post(async function (
     req: { body: IBooking },
-    response: { json: (arg0: any) => void }
+    response: { json: (arg0: any) => void; status: any }
   ) {
     let db_connect = _connection.getDb();
     let myobj = { ...req.body };
-    db_connect
-      .collection(_collection)
-      .insertOne(myobj, function (err: any, res: any) {
-        if (err) throw err;
-        response.json(res);
-      });
+
+    try {
+      console.log("Starting to add:", myobj);
+
+      const res = await db_connect.collection(_collection).insertOne(myobj);
+
+      console.log("Booking added:", res);
+      response.status(201).json({ message: "success", res });
+    } catch (err) {
+      console.error("Error adding booking:", err);
+      response.status(500).json({ error: err });
+    }
   });
 
 // This section will help you update a record by id.
