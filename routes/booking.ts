@@ -6,6 +6,12 @@ const ObjectId = require("mongodb").ObjectId;
 const _collection = process.env.MONGO_COLLECTION || "";
 const _routes = _app.Router();
 
+import { EmailParams, MailerSend, Recipient, Sender } from "mailersend";
+
+const mailersend = new MailerSend({
+  apiKey: process.env.MAILERSEND_API_KEY || "", // Store your MailerSend API key securely
+});
+
 _routes
   .route("/bookings")
   .get(async function (
@@ -28,7 +34,6 @@ _routes
         .collection(_collection)
         .find({})
         .toArray();
-      console.log("Bookings fetched:", result);
       res.json(result); // Send the result as JSON
     } catch (err) {
       console.error("Error fetching bookings:", err);
@@ -61,11 +66,57 @@ _routes
     let myobj = { ...req.body };
 
     try {
-      console.log("Starting to add:", myobj);
-
       const res = await db_connect.collection(_collection).insertOne(myobj);
 
-      console.log("Booking added:", res);
+      const sentFrom = new Sender(
+        "info@trial-0p7kx4xjxyvl9yjr.mlsender.net",
+        "Liisi"
+      );
+
+      const recipients = [new Recipient("liisi.raidaru@gmail.com", "You")];
+
+      const html = `<div><p><strong>Booking Confirmation</strong></p><p>We have received your request. We will contact you shortly.</p><div><p><strong>Check-In:</strong> ${
+        myobj.checkIn
+      }</p><p><strong>Check-Out:</strong>  ${
+        myobj.checkOut
+      }</p>           <p><strong>Price:</strong>  ${
+        myobj.price
+      }</p>       <p><strong>First Name:</strong> ${
+        myobj.firstName
+      }</p>        <p><strong>Last Name:</strong> ${
+        myobj.lastName
+      }</p>        <p><strong>Email:</strong>${myobj.email}</p>        ${
+        !!myobj.message
+          ? `<p><strong>Message:</strong>${myobj.message}</p>`
+          : ""
+      }</div>
+        `;
+
+      const text = `Booking Confirmation. We have received your request. We will contact you shortly. Details: - Check-In: ${
+        myobj.checkIn
+      } - Check-Out:  ${myobj.checkOut} - Price: ${myobj.price} - First Name: ${
+        myobj.firstName
+      } - Last Name: ${myobj.lastName} - Email: ${myobj.email} ${
+        !!myobj.message ? `- Message: ${myobj.message}` : ""
+      }`;
+
+      const emailParams = new EmailParams()
+        .setFrom(sentFrom)
+        .setTo(recipients)
+        .setReplyTo(sentFrom)
+        .setSubject("Ocean One Booking Confirmation")
+        .setHtml(html)
+        .setText(text);
+      // Send the email
+      await mailersend.email
+        .send(emailParams)
+        .then((response: any) => {
+          console.log("Email sent successfully:", response);
+        })
+        .catch((error: any) => {
+          console.error("Failed to send email:", error);
+        });
+
       response.status(201).json({ message: "success", res });
     } catch (err) {
       console.error("Error adding booking:", err);

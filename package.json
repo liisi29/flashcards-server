@@ -7,7 +7,7 @@
     "start": "node build/server.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "server": "nodemon server.ts",
-    "build": "npx tsc --build",
+    "build": "tsc && npx cpx \"data/**/*\" build/data",
     "howto": "first you have to run npm run build and then npm run server"
   },
   "keywords": [],
@@ -17,6 +17,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
+    "mailersend": "^2.3.0",
     "mongodb": "^6.10.0",
     "mongoose": "^8.7.2",
     "nodemon": "^3.1.7",

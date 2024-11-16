@@ -7,6 +7,7 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 app.use(require("./routes/booking"));
+app.use(require("./routes/prices"));
 // Import database connection and connect to MongoDB
 const dbo = require("./db/conn");
 
