@@ -2,7 +2,7 @@ const { MongoClient } = require("mongodb");
 require("dotenv").config();
 
 const uri = process.env.ATLAS_URI;
-const mongoDB = "sample_mflix"; // Use your database name
+const mongoDB = process.env.MONGO_DB || ""; // Use your database name
 
 let _db: any; // Placeholder for the database connection
 
@@ -12,8 +12,8 @@ module.exports = {
   connectToServer: async function (callback: (err: any) => void) {
     try {
       await client.connect();
-      _db = client.db(mongoDB);
-      console.log(`Connected to database: ${_db}`);
+      //   _db = client.db(mongoDB);
+      console.log(`Connected to database: ${mongoDB}`);
       return callback(null);
     } catch (err) {
       console.error("Error connecting to MongoDB:", err);
