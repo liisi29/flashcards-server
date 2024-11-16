@@ -3,8 +3,10 @@
     "target": "es6",
     "module": "commonjs",
     "rootDir": "./",
-    "outDir": "./build",
+    "outDir": "build",
     "esModuleInterop": true,
     "strict": true
-  }
+  },
+
+  "exclude": ["node_modules", "build"]
 }
