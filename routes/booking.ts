@@ -73,7 +73,8 @@ _routes
         "Liisi"
       );
 
-      const recipients = [new Recipient("liisi.raidaru@gmail.com", "You")];
+      const recipients1 = [new Recipient(myobj.email || "", "You")];
+      const recipients2 = [new Recipient("liisi.raidaru@gmail.com", "You")];
 
       const html = `<div><p><strong>Booking Confirmation</strong></p><p>We have received your request. We will contact you shortly.</p><div><p><strong>Check-In:</strong> ${
         myobj.checkIn
@@ -102,11 +103,17 @@ _routes
 
       const emailParams = new EmailParams()
         .setFrom(sentFrom)
-        .setTo(recipients)
+        .setTo(recipients1)
         .setReplyTo(sentFrom)
         .setSubject("Ocean One Booking Confirmation")
         .setHtml(html)
         .setText(text);
+      const emailParams2 = new EmailParams()
+        .setFrom(sentFrom)
+        .setTo(recipients2)
+        .setReplyTo(sentFrom)
+        .setSubject("Ocean One Booking Happened")
+        .setText("New request recieved");
       // Send the email
       await mailersend.email
         .send(emailParams)
@@ -115,6 +122,14 @@ _routes
         })
         .catch((error: any) => {
           console.error("Failed to send email:", error);
+        });
+      await mailersend.email
+        .send(emailParams2)
+        .then((response: any) => {
+          console.log("Confirmation sent successfully:", response);
+        })
+        .catch((error: any) => {
+          console.error("Failed to send confirmation:", error);
         });
 
       response.status(201).json({ message: "success", res });
@@ -194,6 +209,6 @@ interface IBooking {
   price: number;
   firstName?: string;
   lastName?: string;
-  email?: string;
+  email: string;
   message?: string;
 }
