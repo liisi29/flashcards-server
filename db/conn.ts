@@ -19,17 +19,6 @@ module.exports = {
       console.error("Error connecting to MongoDB:", err);
       return callback(err);
     }
-    /*   client.connect(function (err: any) {
-      if (err) {
-        console.error("Error connecting to MongoDB:", err);
-        return callback(err); // Pass the error to the callback
-      }
-
-      // Set the database connection
-      _db = client.db(mongoDB);
-      console.log(`Successfully connected to MongoDB: ${mongoDB}`);
-      return callback(null); // No error, pass null to the callback
-    }); */
   },
 
   getDb: function () {

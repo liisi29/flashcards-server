@@ -4,6 +4,7 @@ const _connection = require("../db/conn");
 const ObjectId = require("mongodb").ObjectId;
 
 const _collection = process.env.MONGO_COLLECTION || "";
+console.log("mongo collection", _collection);
 const _routes = _app.Router();
 
 import { EmailParams, MailerSend, Recipient, Sender } from "mailersend";
@@ -21,7 +22,7 @@ _routes
     let db_connect;
     try {
       db_connect = _connection.getDb();
-      console.log("Database connection established");
+      console.log("Database connection established", db_connect);
     } catch (err) {
       console.error("Error connecting to the database:", err);
       return res
@@ -113,7 +114,7 @@ _routes
         .setTo(recipients2)
         .setReplyTo(sentFrom)
         .setSubject("Ocean One Booking Happened")
-        .setText("New request recieved");
+        .setText(text);
       // Send the email
       await mailersend.email
         .send(emailParams)
