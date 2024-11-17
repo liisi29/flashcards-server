@@ -3,6 +3,7 @@ require("dotenv").config();
 
 const uri = process.env.ATLAS_URI;
 const mongoDB = process.env.MONGO_DB || ""; // Use your database name
+console.log(`creds`, uri, mongoDB);
 
 let _db: any; // Placeholder for the database connection
 
@@ -12,6 +13,7 @@ module.exports = {
   connectToServer: async function (callback: (err: any) => void) {
     try {
       await client.connect();
+      console.log(`Starting to connect to MONGO`);
       _db = client.db(mongoDB);
       console.log(`Connected to database: ${mongoDB}`);
       return callback(null);
