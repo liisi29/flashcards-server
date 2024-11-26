@@ -3,7 +3,6 @@ const _app = require("express");
 const _connection = require("../db/conn");
 const ObjectId = require("mongodb").ObjectId;
 
-const _collection = process.env.MONGO_COLLECTION || "";
 const _collection_dev = process.env.MONGO_COLLECTION_DEV || "";
 const _routes = _app.Router();
 
@@ -13,35 +12,6 @@ const mailersend = new MailerSend({
   apiKey: process.env.MAILERSEND_API_KEY || "", // Store your MailerSend API key securely
 });
 
-_routes
-  .route("/bookings")
-  .get(async function (
-    req: any,
-    res: { json: (arg0: any) => void; status: any }
-  ) {
-    let db_connect;
-    try {
-      db_connect = _connection.getDb();
-      console.log("mongo connection db", _connection);
-      console.log("Database connection established", db_connect);
-    } catch (err) {
-      console.error("Error connecting to the database:", err);
-      return res
-        .status(500)
-        .json({ error: "Failed to connect to the database" });
-    }
-
-    try {
-      const result = await db_connect
-        .collection(_collection)
-        .find({})
-        .toArray();
-      res.json(result); // Send the result as JSON
-    } catch (err) {
-      console.error("Error fetching bookings:", err);
-      res.status(500).json({ error: "Failed to fetch bookings" });
-    }
-  });
 _routes
   .route("/bookings-dev")
   .get(async function (
@@ -71,24 +41,9 @@ _routes
       res.status(500).json({ error: "Failed to fetch bookings" });
     }
   });
-_routes
-  .route("/bookings:id")
-  .get(function (
-    req: { params: { id: any } },
-    res: { json: (arg0: any) => void }
-  ) {
-    let db_connect = _connection.getDb();
-    let myquery = { _id: ObjectId(req.params.id) };
-    db_connect
-      .collection(_collection)
-      .findOne(myquery, function (err: any, result: any) {
-        if (err) throw err;
-        res.json(result);
-      });
-  });
 
 _routes
-  .route("/booking/add")
+  .route("/booking-dev/add")
   .post(async function (
     req: { body: IBooking },
     response: { json: (arg0: any) => void; status: any }
@@ -97,7 +52,7 @@ _routes
     let myobj = { ...req.body };
 
     try {
-      const res = await db_connect.collection(_collection).insertOne(myobj);
+      const res = await db_connect.collection(_collection_dev).insertOne(myobj);
 
       const sentFrom = new Sender(
         "info@trial-0p7kx4xjxyvl9yjr.mlsender.net",
@@ -107,7 +62,7 @@ _routes
       const recipients1 = [new Recipient(myobj.email || "", "You")];
       const recipients2 = [new Recipient("liisi.raidaru@gmail.com", "You")];
 
-      const html = `<div><p><strong>Booking Confirmation</strong></p><p>We have received your request. We will contact you shortly.</p><div><p><strong>Check-In:</strong> ${
+      const html = `<div><p><strong>Booking Confirmation TEST</strong></p><p>We have received your request. We will contact you shortly.</p><div><p><strong>Check-In:</strong> ${
         myobj.checkIn
       }</p><p><strong>Check-Out:</strong>  ${
         myobj.checkOut
@@ -169,69 +124,6 @@ _routes
       response.status(500).json({ error: err });
     }
   });
-
-// This section will help you update a record by id.
-/* countryRoutes.route("/country/update/:id").post(function (
-  req: {
-    body: { code: any; flagUrl: any; orderNumber: any };
-    params: { id: any };
-  },
-  response: { json: (arg0: any) => void }
-) {
-  let db_connect = dbo.getDb();
-  let myquery = { _id: ObjectId(req.params.id) };
-  let newvalues = {
-    $set: {
-      code: req.body.code,
-      flagUrl: req.body.flagUrl,
-      orderNumber: req.body.orderNumber,
-    },
-  };
-  db_connect
-    .collection(process.env.MONGO_COLLECTION)
-    .updateOne(myquery, newvalues, function (err: any, res: any) {
-      if (err) throw err;
-      response.json(res);
-    });
-});
-
-
-
-// This section will help you get a single country by id
-countryRoutes
-  .route("/country/:id")
-  .get(function (
-    req: { params: { id: any } },
-    res: { json: (arg0: any) => void }
-  ) {
-    let db_connect = dboCountry.getDb();
-    let myquery = { _id: ObjectId(req.params.id) };
-    db_connect
-      .collection("countries")
-      .findOne(myquery, function (err: any, result: any) {
-        if (err) throw err;
-        res.json(result);
-      });
-  });
-
-countryRoutes
-  .route("/country/delete/:id")
-  .delete(
-    (req: { params: { id: any } }, response: { json: (arg0: any) => void }) => {
-      let db_connect = dboCountry.getDb();
-      let myquery = { _id: ObjectId(req.params.id) };
-      db_connect
-        .collection(process.env.MONGO_COLLECTION)
-        .deleteOne(myquery, function (err: any, obj: any) {
-          if (err) throw err;
-          response.json(obj);
-        });
-    }
-  );
-
-
- */
-
 module.exports = _routes;
 
 interface IBooking {
