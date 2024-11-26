@@ -13,7 +13,7 @@ const mailersend = new MailerSend({
 });
 
 _routes
-  .route("/bookings-dev")
+  .route("/dev/bookings")
   .get(async function (
     req: any,
     res: { json: (arg0: any) => void; status: any }
@@ -43,7 +43,7 @@ _routes
   });
 
 _routes
-  .route("/booking-dev/add")
+  .route("/dev/booking/add")
   .post(async function (
     req: { body: IBooking },
     response: { json: (arg0: any) => void; status: any }
