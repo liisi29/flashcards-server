@@ -14,16 +14,20 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@types/multer": "^2.1.0",
+    "cloudinary": "^2.9.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
-    "mailersend": "^2.3.0",
     "mongodb": "^6.10.0",
-    "mongoose": "^8.7.2",
+    "multer": "^2.1.1",
     "nodemon": "^3.1.7",
     "ts-node": "^10.9.2"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.5.0",
     "typescript": "^5.6.3"
   }
 }
