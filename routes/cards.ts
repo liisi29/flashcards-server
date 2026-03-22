@@ -30,13 +30,30 @@ _routes.post("/upload", upload.single("image"), async (req: Request, res: Respon
   }
 });
 
-_routes.get("/cards", async (_req: Request, res: Response) => {
+// GET /cards?viewer=Liisi&subject=Saksa keel
+_routes.get("/cards", async (req: Request, res: Response) => {
   try {
     const db = _connection.getDb();
-    const result = await db.collection(_collection).find({}).toArray();
+    const query: any = {};
+    if (req.query.viewer) query.viewers = req.query.viewer;
+    if (req.query.subject) query.subject = req.query.subject;
+    const result = await db.collection(_collection).find(query).toArray();
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch cards" });
+  }
+});
+
+// GET /subjects?viewer=Liisi — get distinct subjects visible to a viewer
+_routes.get("/subjects", async (req: Request, res: Response) => {
+  try {
+    const db = _connection.getDb();
+    const query: any = {};
+    if (req.query.viewer) query.viewers = req.query.viewer;
+    const subjects = await db.collection(_collection).distinct("subject", query);
+    res.json(subjects.filter(Boolean));
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch subjects" });
   }
 });
 
@@ -60,6 +77,24 @@ _routes.put("/cards/:id", async (req: Request, res: Response) => {
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: "Failed to update card" });
+  }
+});
+
+// PATCH /cards/:id/progress — update one person's progress color
+_routes.patch("/cards/:id/progress", async (req: Request, res: Response) => {
+  try {
+    const { ObjectId } = require("mongodb");
+    const { name, color } = req.body; // color: "red" | "yellow" | "green"
+    const db = _connection.getDb();
+    const result = await db
+      .collection(_collection)
+      .updateOne(
+        { _id: new ObjectId(req.params.id) },
+        { $set: { [`progress.${name}`]: color } }
+      );
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update progress" });
   }
 });
 
