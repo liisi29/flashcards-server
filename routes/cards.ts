@@ -30,14 +30,14 @@ _routes.post("/upload", upload.single("image"), async (req: Request, res: Respon
   }
 });
 
-// GET /cards?viewer=Liisi&subject=saksa keel&topic=numbrid
+// GET /cards?viewer=Liisi&subjectId=123&topicId=456
 _routes.get("/cards", async (req: Request, res: Response) => {
   try {
     const db = _connection.getDb();
     const query: any = {};
     if (req.query.viewer) query.viewers = req.query.viewer;
-    if (req.query.subject) query.subject = req.query.subject;
-    if (req.query.topic) query.topic = req.query.topic;
+    if (req.query.subjectId) query.subjectId = req.query.subjectId;
+    if (req.query.topicId) query.topicId = req.query.topicId;
     const result = await db.collection(_collection).find(query).toArray();
     res.json(result);
   } catch (err) {
@@ -45,32 +45,6 @@ _routes.get("/cards", async (req: Request, res: Response) => {
   }
 });
 
-// GET /subjects?viewer=Liisi — get distinct subjects visible to a viewer
-_routes.get("/subjects", async (req: Request, res: Response) => {
-  try {
-    const db = _connection.getDb();
-    const query: any = {};
-    if (req.query.viewer) query.viewers = req.query.viewer;
-    const subjects = await db.collection(_collection).distinct("subject", query);
-    res.json(subjects.filter(Boolean));
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch subjects" });
-  }
-});
-
-// GET /topics?viewer=Liisi&subject=saksa keel — get distinct topics for a subject
-_routes.get("/topics", async (req: Request, res: Response) => {
-  try {
-    const db = _connection.getDb();
-    const query: any = {};
-    if (req.query.viewer) query.viewers = req.query.viewer;
-    if (req.query.subject) query.subject = req.query.subject;
-    const topics = await db.collection(_collection).distinct("topic", query);
-    res.json(topics.filter(Boolean));
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch topics" });
-  }
-});
 
 _routes.post("/cards/add", async (req: Request, res: Response) => {
   try {
