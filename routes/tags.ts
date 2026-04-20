@@ -4,10 +4,14 @@ const _connection = require("../db/conn");
 const TAGS_COLLECTION = "tags";
 const _routes = Router();
 
+// GET /tags?subjectId=&topicId=
 _routes.get("/tags", async (req: Request, res: Response) => {
   try {
     const db = _connection.getDb();
-    const result = await db.collection(TAGS_COLLECTION).find({}).toArray();
+    const query: any = {};
+    if (req.query.subjectId) query.subjectId = req.query.subjectId;
+    if (req.query.topicId) query.topicId = req.query.topicId;
+    const result = await db.collection(TAGS_COLLECTION).find(query).toArray();
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch tags" });
@@ -16,10 +20,10 @@ _routes.get("/tags", async (req: Request, res: Response) => {
 
 _routes.post("/tags", async (req: Request, res: Response) => {
   try {
-    const { name, color } = req.body;
+    const { name, color, subjectId, topicId } = req.body;
     if (!name) { res.status(400).json({ error: "name required" }); return; }
     const db = _connection.getDb();
-    const result = await db.collection(TAGS_COLLECTION).insertOne({ name, color: color || "#94a3b8" });
+    const result = await db.collection(TAGS_COLLECTION).insertOne({ name, color: color || "#94a3b8", subjectId, topicId });
     const inserted = await db.collection(TAGS_COLLECTION).findOne({ _id: result.insertedId });
     res.status(201).json(inserted);
   } catch (err) {
