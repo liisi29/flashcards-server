@@ -7,6 +7,27 @@ const CARDS_COLLECTION = process.env.MONGO_COLLECTION || "flash1";
 const CHUNK = 15;
 const _routes = Router();
 
+const isDupKey = (err: any) => err && (err.code === 11000 || err.code === 11001);
+
+// One-time: a unique index on (tagId, number) so concurrent materialization
+// can't create two "Group 1"s for the same tag — the loser's insert throws
+// and we just re-read.
+let _indexReady: Promise<void> | null = null;
+function ensureIndex(db: any) {
+  if (!_indexReady) {
+    _indexReady = db
+      .collection(GROUPS_COLLECTION)
+      .createIndex({ tagId: 1, number: 1 }, { unique: true })
+      .then(() => {})
+      .catch((err: any) => {
+        // leave it unset so a later call retries; log once
+        _indexReady = null;
+        console.error("groups unique index failed:", err.message);
+      });
+  }
+  return _indexReady;
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────
 
 // cards that carry a given tag, in stable insertion order
@@ -23,12 +44,16 @@ async function tagCards(db: any, tagId: string) {
 // - already grouped, new  -> append unassigned cards to the last group,
 //   spilling into fresh groups every CHUNK cards
 async function ensureGroups(db: any, tagId: string) {
+  await ensureIndex(db);
+  const read = () =>
+    db
+      .collection(GROUPS_COLLECTION)
+      .find({ tagId })
+      .sort({ number: 1 })
+      .toArray();
+
   const cards = await tagCards(db, tagId);
-  let groups = await db
-    .collection(GROUPS_COLLECTION)
-    .find({ tagId })
-    .sort({ number: 1 })
-    .toArray();
+  let groups = await read();
 
   if (cards.length <= CHUNK && groups.length === 0) return groups;
 
@@ -46,12 +71,17 @@ async function ensureGroups(db: any, tagId: string) {
         cardIds: cardIds.slice(i, i + CHUNK),
       });
     }
-    if (docs.length) await db.collection(GROUPS_COLLECTION).insertMany(docs);
-    return db
-      .collection(GROUPS_COLLECTION)
-      .find({ tagId })
-      .sort({ number: 1 })
-      .toArray();
+    if (docs.length) {
+      try {
+        await db
+          .collection(GROUPS_COLLECTION)
+          .insertMany(docs, { ordered: false });
+      } catch (err) {
+        // another request materialized this tag first — that's fine
+        if (!isDupKey(err)) throw err;
+      }
+    }
+    return read();
   }
 
   // existing groups — file any card that isn't in a group yet
@@ -68,16 +98,25 @@ async function ensureGroups(db: any, tagId: string) {
   for (const id of orphans) {
     if (bucket.length >= CHUNK) {
       ops.push({ set: last._id, cardIds: bucket });
-      // start a new group
-      const doc = {
-        subjectId: cards[0].subjectId,
-        topicId: cards[0].topicId,
-        tagId,
-        number: nextNumber++,
-        cardIds: [] as string[],
-      };
-      const res = await db.collection(GROUPS_COLLECTION).insertOne(doc);
-      last = { ...doc, _id: res.insertedId };
+      // start a new group — upsert on (tagId, number) so a concurrent
+      // request adding the same group can't duplicate it
+      const number = nextNumber++;
+      await db.collection(GROUPS_COLLECTION).updateOne(
+        { tagId, number },
+        {
+          $setOnInsert: {
+            subjectId: cards[0].subjectId,
+            topicId: cards[0].topicId,
+            tagId,
+            number,
+            cardIds: [] as string[],
+          },
+        },
+        { upsert: true }
+      );
+      last = await db
+        .collection(GROUPS_COLLECTION)
+        .findOne({ tagId, number });
       bucket = [];
     }
     bucket.push(id);
@@ -90,11 +129,7 @@ async function ensureGroups(db: any, tagId: string) {
       .updateOne({ _id: op.set }, { $set: { cardIds: op.cardIds } });
   }
 
-  return db
-    .collection(GROUPS_COLLECTION)
-    .find({ tagId })
-    .sort({ number: 1 })
-    .toArray();
+  return read();
 }
 
 // ── routes ───────────────────────────────────────────────────────────────
