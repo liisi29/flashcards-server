@@ -3,20 +3,119 @@ const _connection = require("../db/conn");
 const { ObjectId } = require("mongodb");
 
 const GROUPS_COLLECTION = "groups";
+const CARDS_COLLECTION = process.env.MONGO_COLLECTION || "flash1";
+const CHUNK = 15;
 const _routes = Router();
 
-// GET /groups?subjectId=&topicId=&tagId=  (any subset; tagId narrows to one tag)
+// ── helpers ──────────────────────────────────────────────────────────────
+
+// cards that carry a given tag, in stable insertion order
+async function tagCards(db: any, tagId: string) {
+  return db
+    .collection(CARDS_COLLECTION)
+    .find({ tagIds: tagId })
+    .toArray();
+}
+
+// Ensure a tag's groups exist and cover every current card.
+// - <= CHUNK cards        -> no groups
+// - > CHUNK, none yet     -> create ceil(N/CHUNK) groups, chunk cards in order
+// - already grouped, new  -> append unassigned cards to the last group,
+//   spilling into fresh groups every CHUNK cards
+async function ensureGroups(db: any, tagId: string) {
+  const cards = await tagCards(db, tagId);
+  let groups = await db
+    .collection(GROUPS_COLLECTION)
+    .find({ tagId })
+    .sort({ number: 1 })
+    .toArray();
+
+  if (cards.length <= CHUNK && groups.length === 0) return groups;
+
+  const cardIds: string[] = cards.map((c: any) => String(c._id));
+
+  if (groups.length === 0) {
+    // first materialization
+    const docs = [];
+    for (let i = 0; i < cardIds.length; i += CHUNK) {
+      docs.push({
+        subjectId: cards[i].subjectId,
+        topicId: cards[i].topicId,
+        tagId,
+        number: docs.length + 1,
+        cardIds: cardIds.slice(i, i + CHUNK),
+      });
+    }
+    if (docs.length) await db.collection(GROUPS_COLLECTION).insertMany(docs);
+    return db
+      .collection(GROUPS_COLLECTION)
+      .find({ tagId })
+      .sort({ number: 1 })
+      .toArray();
+  }
+
+  // existing groups — file any card that isn't in a group yet
+  const assigned = new Set<string>();
+  groups.forEach((g: any) => (g.cardIds || []).forEach((id: string) => assigned.add(id)));
+  const orphans = cardIds.filter((id) => !assigned.has(id));
+  if (orphans.length === 0) return groups;
+
+  let last = groups[groups.length - 1];
+  let bucket: string[] = [...(last.cardIds || [])];
+  const ops: any[] = [];
+  let nextNumber = last.number + 1;
+
+  for (const id of orphans) {
+    if (bucket.length >= CHUNK) {
+      ops.push({ set: last._id, cardIds: bucket });
+      // start a new group
+      const doc = {
+        subjectId: cards[0].subjectId,
+        topicId: cards[0].topicId,
+        tagId,
+        number: nextNumber++,
+        cardIds: [] as string[],
+      };
+      const res = await db.collection(GROUPS_COLLECTION).insertOne(doc);
+      last = { ...doc, _id: res.insertedId };
+      bucket = [];
+    }
+    bucket.push(id);
+  }
+  ops.push({ set: last._id, cardIds: bucket });
+
+  for (const op of ops) {
+    await db
+      .collection(GROUPS_COLLECTION)
+      .updateOne({ _id: op.set }, { $set: { cardIds: op.cardIds } });
+  }
+
+  return db
+    .collection(GROUPS_COLLECTION)
+    .find({ tagId })
+    .sort({ number: 1 })
+    .toArray();
+}
+
+// ── routes ───────────────────────────────────────────────────────────────
+
+// GET /groups?tagId=  (required) — lazily materializes on read
+// GET /groups?subjectId=&topicId=  — every already-materialized group in scope
 _routes.get("/groups", async (req: Request, res: Response) => {
   try {
     const db = _connection.getDb();
+    if (req.query.tagId) {
+      const groups = await ensureGroups(db, String(req.query.tagId));
+      res.json(groups);
+      return;
+    }
     const query: any = {};
     if (req.query.subjectId) query.subjectId = req.query.subjectId;
     if (req.query.topicId) query.topicId = req.query.topicId;
-    if (req.query.tagId) query.tagId = req.query.tagId;
     const result = await db
       .collection(GROUPS_COLLECTION)
       .find(query)
-      .sort({ order: 1 })
+      .sort({ number: 1 })
       .toArray();
     res.json(result);
   } catch (err) {
@@ -24,67 +123,9 @@ _routes.get("/groups", async (req: Request, res: Response) => {
   }
 });
 
-// POST /groups  { name, subjectId, topicId, tagId, cardIds? }
-// Groups always belong to a tag.
-_routes.post("/groups", async (req: Request, res: Response) => {
-  try {
-    const { name, subjectId, topicId, tagId } = req.body;
-    if (!name || !subjectId || !topicId || !tagId) {
-      res
-        .status(400)
-        .json({ error: "name, subjectId, topicId, tagId required" });
-      return;
-    }
-    const db = _connection.getDb();
-    // next order value within this tag
-    const last = await db
-      .collection(GROUPS_COLLECTION)
-      .find({ tagId })
-      .sort({ order: -1 })
-      .limit(1)
-      .toArray();
-    const order = last.length ? (last[0].order ?? 0) + 1 : 0;
-    const doc = {
-      name,
-      subjectId,
-      topicId,
-      tagId,
-      cardIds: Array.isArray(req.body.cardIds) ? req.body.cardIds : [],
-      order,
-    };
-    const result = await db.collection(GROUPS_COLLECTION).insertOne(doc);
-    const inserted = await db
-      .collection(GROUPS_COLLECTION)
-      .findOne({ _id: result.insertedId });
-    res.status(201).json(inserted);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to create group" });
-  }
-});
-
-// PUT /groups/:id  { name?, cardIds?, order? }  (tagId is fixed once created)
-_routes.put("/groups/:id", async (req: Request, res: Response) => {
-  try {
-    const db = _connection.getDb();
-    const set: any = {};
-    if (typeof req.body.name === "string") set.name = req.body.name;
-    if (Array.isArray(req.body.cardIds)) set.cardIds = req.body.cardIds;
-    if (typeof req.body.order === "number") set.order = req.body.order;
-    await db
-      .collection(GROUPS_COLLECTION)
-      .updateOne({ _id: new ObjectId(req.params.id) }, { $set: set });
-    const updated = await db
-      .collection(GROUPS_COLLECTION)
-      .findOne({ _id: new ObjectId(req.params.id) });
-    res.json(updated);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to update group" });
-  }
-});
-
 // PATCH /groups/:id/cards  { add?: string[], remove?: string[] }
-// Strips the added cards out of every other group with the SAME tag,
-// enforcing "one group per card, per tag".
+// Manual rebalancing between existing groups of the same tag. Adding a card
+// pulls it out of every other group under that tag.
 _routes.patch("/groups/:id/cards", async (req: Request, res: Response) => {
   try {
     const db = _connection.getDb();
@@ -100,7 +141,6 @@ _routes.patch("/groups/:id/cards", async (req: Request, res: Response) => {
       : [];
 
     if (add.length) {
-      // remove these cards from other groups under the same tag
       await db
         .collection(GROUPS_COLLECTION)
         .updateMany(
@@ -117,22 +157,16 @@ _routes.patch("/groups/:id/cards", async (req: Request, res: Response) => {
     await db
       .collection(GROUPS_COLLECTION)
       .updateOne({ _id: id }, { $set: { cardIds: next } });
-    const updated = await db.collection(GROUPS_COLLECTION).findOne({ _id: id });
-    res.json(updated);
+
+    // return the whole tag's groups so the client stays in sync
+    const groups = await db
+      .collection(GROUPS_COLLECTION)
+      .find({ tagId: group.tagId })
+      .sort({ number: 1 })
+      .toArray();
+    res.json(groups);
   } catch (err) {
     res.status(500).json({ error: "Failed to update group cards" });
-  }
-});
-
-_routes.delete("/groups/:id", async (req: Request, res: Response) => {
-  try {
-    const db = _connection.getDb();
-    await db
-      .collection(GROUPS_COLLECTION)
-      .deleteOne({ _id: new ObjectId(req.params.id) });
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: "Failed to delete group" });
   }
 });
 

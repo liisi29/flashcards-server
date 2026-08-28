@@ -43,3 +43,9 @@ CLOUDINARY_API_SECRET=...
 | PUT | /subjects/:id | Rename subject/topic |
 | DELETE | /subjects/:id | Delete subject and its topics |
 | POST | /upload | Upload image to Cloudinary |
+
+### How to deploy?
+
+For your backend changes to take place, you have to go to render.com.
+Log in with gitlab
+And make a deploy from last commit (not complicated)
