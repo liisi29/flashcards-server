@@ -94,6 +94,13 @@ _routes.delete("/cards/:id", async (req: Request, res: Response) => {
     const result = await db
       .collection(_collection)
       .deleteOne({ _id: new ObjectId(req.params.id) });
+    // drop the card from any group it was in
+    await db
+      .collection("groups")
+      .updateMany(
+        { cardIds: req.params.id },
+        { $pull: { cardIds: req.params.id } }
+      );
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: "Failed to delete card" });

@@ -9,6 +9,8 @@ app.use(express.json());
 app.use(require("./routes/cards"));
 app.use(require("./routes/subjects"));
 app.use(require("./routes/tags"));
+app.use(require("./routes/groups"));
+app.use(require("./routes/userstate"));
 
 const dbo = require("./db/conn");
 
