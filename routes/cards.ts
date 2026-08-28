@@ -69,6 +69,42 @@ _routes.put("/cards/:id", async (req: Request, res: Response) => {
   }
 });
 
+// PATCH /cards/bulk-move — move many cards to a subject/topic and set their tags
+// body: { cardIds: string[], subjectId, topicId, tagIds: string[] }
+_routes.patch("/cards/bulk-move", async (req: Request, res: Response) => {
+  try {
+    const { ObjectId } = require("mongodb");
+    const { cardIds, subjectId, topicId, tagIds } = req.body;
+    if (!Array.isArray(cardIds) || !cardIds.length || !subjectId || !topicId) {
+      res
+        .status(400)
+        .json({ error: "cardIds, subjectId, topicId required" });
+      return;
+    }
+    const db = _connection.getDb();
+    const ids = cardIds.map((id: string) => new ObjectId(id));
+    const result = await db.collection(_collection).updateMany(
+      { _id: { $in: ids } },
+      {
+        $set: {
+          subjectId,
+          topicId,
+          tagIds: Array.isArray(tagIds) ? tagIds : [],
+        },
+      }
+    );
+    // moved cards leave any group they were in
+    await db
+      .collection("groups")
+      .updateMany({ cardIds: { $in: cardIds } }, {
+        $pull: { cardIds: { $in: cardIds } },
+      });
+    res.json({ moved: result.modifiedCount });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to move cards" });
+  }
+});
+
 // PATCH /cards/:id/progress — update one person's progress color
 _routes.patch("/cards/:id/progress", async (req: Request, res: Response) => {
   try {
