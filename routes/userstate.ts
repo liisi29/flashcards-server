@@ -4,22 +4,6 @@ const _connection = require("../db/conn");
 const USERSTATE_COLLECTION = "userstate";
 const _routes = Router();
 
-// GET /userstate
-//   -> [{ _id, lastActive }, ...] for every known user — used to show
-//   when each household member last opened the app.
-_routes.get("/userstate", async (_req: Request, res: Response) => {
-  try {
-    const db = _connection.getDb();
-    const docs = await db
-      .collection(USERSTATE_COLLECTION)
-      .find({}, { projection: { _id: 1, lastActive: 1 } })
-      .toArray();
-    res.json(docs);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch user states" });
-  }
-});
-
 // GET /userstate/:user
 //   -> { learntGroups: {...}, learnPos: {...}, settings: {...}, lastActive }
 _routes.get("/userstate/:user", async (req: Request, res: Response) => {
