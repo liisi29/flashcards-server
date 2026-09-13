@@ -4,8 +4,24 @@ const _connection = require("../db/conn");
 const USERSTATE_COLLECTION = "userstate";
 const _routes = Router();
 
+// GET /userstate
+//   -> [{ _id, lastActive }, ...] for every known user — used to show
+//   when each household member last opened the app.
+_routes.get("/userstate", async (_req: Request, res: Response) => {
+  try {
+    const db = _connection.getDb();
+    const docs = await db
+      .collection(USERSTATE_COLLECTION)
+      .find({}, { projection: { _id: 1, lastActive: 1 } })
+      .toArray();
+    res.json(docs);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch user states" });
+  }
+});
+
 // GET /userstate/:user
-//   -> { learntGroups: {...}, learnPos: {...}, settings: {...} }
+//   -> { learntGroups: {...}, learnPos: {...}, settings: {...}, lastActive }
 _routes.get("/userstate/:user", async (req: Request, res: Response) => {
   try {
     const db = _connection.getDb();
@@ -18,12 +34,36 @@ _routes.get("/userstate/:user", async (req: Request, res: Response) => {
         learntGroups: {},
         learnPos: {},
         settings: {},
+        lastActive: null,
       }
     );
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch user state" });
   }
 });
+
+// PATCH /userstate/:user/touch
+// Stamps lastActive with the current time — called when a user opens
+// the app, so the household can see who's been studying recently.
+_routes.patch(
+  "/userstate/:user/touch",
+  async (req: Request, res: Response) => {
+    try {
+      const db = _connection.getDb();
+      const lastActive = new Date();
+      await db
+        .collection(USERSTATE_COLLECTION)
+        .updateOne(
+          { _id: req.params.user },
+          { $set: { lastActive } },
+          { upsert: true }
+        );
+      res.json({ ok: true, lastActive });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to update last active" });
+    }
+  }
+);
 
 // PATCH /userstate/:user/settings  { <key>: <value>, ... }
 // Merges a partial settings object (card background, group size, start
