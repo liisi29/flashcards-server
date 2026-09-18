@@ -123,6 +123,24 @@ _routes.patch("/cards/:id/progress", async (req: Request, res: Response) => {
   }
 });
 
+// PATCH /cards/:id/notes — update one person's notes
+_routes.patch("/cards/:id/notes", async (req: Request, res: Response) => {
+  try {
+    const { ObjectId } = require("mongodb");
+    const { name, notes } = req.body;
+    const db = _connection.getDb();
+    const result = await db
+      .collection(_collection)
+      .updateOne(
+        { _id: new ObjectId(req.params.id) },
+        { $set: { [`notes.${name}`]: notes } }
+      );
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update notes" });
+  }
+});
+
 _routes.delete("/cards/:id", async (req: Request, res: Response) => {
   try {
     const { ObjectId } = require("mongodb");
