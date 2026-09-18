@@ -11,6 +11,7 @@ app.use(require("./routes/subjects"));
 app.use(require("./routes/tags"));
 app.use(require("./routes/groups"));
 app.use(require("./routes/userstate"));
+app.use(require("./routes/share"));
 
 const dbo = require("./db/conn");
 
